@@ -1,0 +1,910 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<title>HKU Common Ground | Panel Demo</title>
+<style>
+:root{color-scheme:light dark;--background:light-dark(#fff,#202221);--foreground:light-dark(#222,#eee);--muted:light-dark(#eee,#333);--muted-foreground:light-dark(#666,#aaa);--border:light-dark(#ddd,#555);--primary:light-dark(#315e49,#99c9ab);--primary-foreground:light-dark(#fff,#152b1e)}
+body{margin:0 auto;padding:20px;max-width:1024px;background:var(--background);color:var(--foreground);font:14px/1.5 system-ui;overflow-wrap:anywhere}*{box-sizing:border-box}
+#raccoon-export-controls{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}#raccoon-export-controls:empty{display:none}
+#raccoon-export-controls label{display:grid;gap:6px}input,select,button{font:inherit;max-width:100%}button,select{cursor:pointer}
+</style><script>/* Local export adapter: memory-only state and DOM controls, with no application bridge. */
+(() => {
+  const handlers = new Set();
+  window.RaccoonHost = {
+    language: document.documentElement.lang,
+    snapshot: { data: null, design: {} },
+    subscribe(fn) {
+      handlers.add(fn);
+      return () => handlers.delete(fn);
+    },
+    send(message) {
+      if (message.type !== 'design-register') return;
+      const panel = document.getElementById('raccoon-export-controls');
+      if (!panel) return;
+      panel.replaceChildren();
+      for (const field of message.fields) {
+        const label = document.createElement('label');
+        const caption = document.createElement('span');
+        caption.textContent = field.label;
+        const control = document.createElement(field.kind === 'select' ? 'select' : 'input');
+        if (field.kind === 'select') {
+          field.options.forEach(value => {
+            const option = document.createElement('option');
+            option.textContent = option.value = value;
+            control.append(option);
+          });
+        } else {
+          control.type = { range: 'range', color: 'color', toggle: 'checkbox' }[field.kind];
+          if (field.kind === 'range') {
+            control.min = field.min;
+            control.max = field.max;
+            control.step = field.step;
+          }
+          if (field.kind === 'toggle') control.checked = field.value;
+        }
+        control.value = String(field.value);
+        control.onchange = () =>
+          handlers.forEach(fn =>
+            fn({
+              type: 'design-change',
+              id: field.id,
+              value:
+                field.kind === 'toggle'
+                  ? control.checked
+                  : field.kind === 'range'
+                    ? Number(control.value)
+                    : control.value,
+            }),
+          );
+        label.append(caption, control);
+        panel.append(label);
+      }
+    },
+  };
+})();
+</script></head><body><div id="raccoon-export-controls"></div><style>/* Raccoon conversation primitives. Published with each immutable fragment. */
+[hidden] {
+  display: none !important;
+}
+.rv-variants {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 0;
+  flex-wrap: wrap;
+}
+.rv-variants :is(button, select) {
+  font: inherit;
+  color: var(--foreground);
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  max-width: 100%;
+  cursor: pointer;
+}
+.rv-variants button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.rv-schedule {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.rv-schedule li {
+  display: grid;
+  grid-template-columns: minmax(85px, auto) 1fr;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.rv-schedule time {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-foreground);
+}
+.viz {
+  color: var(--foreground);
+  font:
+    400 14px/1.5 system-ui,
+    sans-serif;
+  padding: 8px 0;
+}
+.viz :is(h1, h2, h3, p) {
+  margin: 0;
+}
+.viz :is(h1, h2, h3, strong) {
+  font-size: inherit;
+  font-weight: 500;
+}
+.viz-stack {
+  display: grid;
+  gap: 20px;
+}
+.viz-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.viz-controls,
+.viz-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 24px;
+}
+.viz-field {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.viz-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+}
+.viz-muted {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.viz-number {
+  font-variant-numeric: tabular-nums;
+}
+.viz-metric {
+  display: grid;
+  gap: 6px;
+  padding: 16px 0;
+  border-top: 1px solid var(--border);
+}
+.viz-value {
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+}
+.viz-button {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--foreground);
+  padding: 7px 12px;
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+}
+.viz-button:is(:hover, [aria-pressed='true']) {
+  background: var(--muted);
+}
+.viz-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.viz-input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--foreground);
+  background: var(--background);
+  font: inherit;
+}
+.viz-range {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--foreground);
+}
+/* Optional motion composition. Existing calculators and dashboards keep their layout. */
+.viz.viz-motion {
+  display: grid;
+  gap: 14px;
+  padding: 0;
+}
+.viz-motion .viz-title {
+  font-size: 20px;
+  line-height: 1.35;
+  letter-spacing: -0.015em;
+}
+.viz-motion .viz-scene {
+  min-width: 0;
+  max-width: 100%;
+}
+.viz-motion .viz-caption {
+  font-size: 13px;
+  line-height: 1.7;
+}
+.viz-motion .viz-readout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  min-width: 0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.viz-motion .viz-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.viz-motion .viz-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.viz-motion .viz-controls > .viz-field {
+  flex: 0 1 280px;
+  gap: 6px;
+}
+.viz-motion .viz-note {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.viz :focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+.viz-table {
+  border-collapse: collapse;
+  width: 100%;
+  text-align: left;
+}
+.viz-table :is(th, td) {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 400;
+}
+.viz-table th {
+  color: var(--muted-foreground);
+}
+.viz-table .viz-number {
+  text-align: right;
+}
+@media (prefers-reduced-motion: reduce) {
+  .viz * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+</style><script>/* Raccoon Work visualization helpers. No network, native access, or model invocation. */
+(() => {
+  const host = window.RaccoonHost;
+  const groups = new Map();
+  const listeners = new Set();
+  const languageListeners = new Set();
+  const snapshot = host?.snapshot || { data: null, design: {} };
+  let language = host?.language || document.documentElement.lang || 'zh';
+  const clone = value => JSON.parse(JSON.stringify(value));
+  const labels = {
+    zh: { previous: '上一个方案', next: '下一个方案', variant: '设计方案' },
+    en: { previous: 'Previous design', next: 'Next design', variant: 'Design option' },
+    ja: { previous: '前のデザイン', next: '次のデザイン', variant: 'デザイン案' },
+  };
+  const text = () => labels[language.split('-')[0]] || labels.en;
+  const publish = () => {
+    const serialized = JSON.stringify(snapshot);
+    if (new TextEncoder().encode(serialized).length > 16384)
+      throw new RangeError('Visualization state exceeds 16 KiB');
+    host?.send({ type: 'snapshot', snapshot: JSON.parse(serialized) });
+  };
+  const valid = (field, value) => {
+    if (field.kind === 'range')
+      return (
+        typeof value === 'number' &&
+        Number.isFinite(value) &&
+        value >= field.min &&
+        value <= field.max
+      );
+    if (field.kind === 'toggle') return typeof value === 'boolean';
+    if (field.kind === 'color') return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
+    return field.kind === 'select' && field.options.includes(value);
+  };
+  const descriptors = () =>
+    [...groups.values()].flatMap(group =>
+      group.fields.map(field => ({
+        ...field,
+        id: `${group.id}/${field.key}`,
+        label: `${group.label} · ${field.label}`,
+        value: group.values[field.key],
+        initial: group.initial[field.key],
+      })),
+    );
+  const register = () => host?.send({ type: 'design-register', fields: descriptors() });
+  host?.subscribe(message => {
+    if (message.language) {
+      language = message.language;
+      languageListeners.forEach(fn => fn(language));
+    }
+    if (message.type !== 'design-change') return;
+    for (const group of groups.values()) {
+      const field = group.fields.find(item => `${group.id}/${item.key}` === message.id);
+      if (!field || !valid(field, message.value)) continue;
+      group.values[field.key] = message.value;
+      snapshot.design[message.id] = message.value;
+      group.onChange({ ...group.values });
+      publish();
+      register();
+      break;
+    }
+  });
+  window.RaccoonViz = {
+    get language() {
+      return language;
+    },
+    get state() {
+      return clone(snapshot.data);
+    },
+    saveState(data) {
+      const next = clone(data);
+      if (new TextEncoder().encode(JSON.stringify({ ...snapshot, data: next })).length > 16384)
+        throw new RangeError('Visualization state exceeds 16 KiB');
+      snapshot.data = next;
+      publish();
+      listeners.forEach(fn => fn(clone(next)));
+    },
+    onState(fn) {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
+    onLanguage(fn) {
+      languageListeners.add(fn);
+      return () => languageListeners.delete(fn);
+    },
+    linearCosts(a, b, quantity) {
+      if (![a.fixed, a.rate, b.fixed, b.rate, quantity].every(Number.isFinite))
+        throw new TypeError('Linear costs require finite fixed costs, rates and quantity');
+      const costA = a.fixed + a.rate * quantity,
+        costB = b.fixed + b.rate * quantity;
+      const difference = costA - costB;
+      const equal =
+        Math.abs(difference) <= Number.EPSILON * Math.max(1, Math.abs(costA), Math.abs(costB)) * 4;
+      const crossing = a.rate === b.rate ? null : (b.fixed - a.fixed) / (a.rate - b.rate);
+      const atCrossing =
+        crossing !== null &&
+        Math.abs(crossing - quantity) <=
+          Number.EPSILON * Math.max(1, Math.abs(crossing), Math.abs(quantity)) * 4;
+      return {
+        costA,
+        costB,
+        difference: equal ? 0 : difference,
+        savings: equal ? 0 : Math.abs(difference),
+        winner: equal ? 'tie' : difference < 0 ? 'A' : 'B',
+        crossing,
+        side:
+          crossing === null ? null : atCrossing ? 'at' : quantity < crossing ? 'before' : 'after',
+        distance: crossing === null ? null : atCrossing ? 0 : Math.abs(crossing - quantity),
+      };
+    },
+    polyline(points, { closed = false } = {}) {
+      if (
+        !Array.isArray(points) ||
+        points.length < 2 ||
+        !Array.from(points).every(
+          point =>
+            Array.isArray(point) &&
+            point.length === 2 &&
+            Number.isFinite(point[0]) &&
+            Number.isFinite(point[1]),
+        )
+      )
+        throw new TypeError('Polyline requires at least two finite [x, y] points');
+      const path = points.map(point => [...point]);
+      const first = path[0],
+        last = path[path.length - 1];
+      if (closed && (first[0] !== last[0] || first[1] !== last[1])) path.push([...first]);
+      const distances = [0];
+      for (let index = 1; index < path.length; index++) {
+        const previous = path[index - 1],
+          current = path[index];
+        distances.push(
+          distances[index - 1] + Math.hypot(current[0] - previous[0], current[1] - previous[1]),
+        );
+      }
+      const length = distances[distances.length - 1];
+      if (!Number.isFinite(length)) throw new RangeError('Polyline length must be finite');
+      path.forEach(Object.freeze);
+      Object.freeze(path);
+      return {
+        points: path,
+        length,
+        distanceAt(index) {
+          if (!Number.isInteger(index) || index < 0 || index >= path.length)
+            throw new RangeError('Polyline vertex index is out of range');
+          return distances[index];
+        },
+        pointAt(distance) {
+          if (!Number.isFinite(distance)) throw new TypeError('Polyline distance must be finite');
+          if (!length) return { x: first[0], y: first[1], angle: 0 };
+          const offset = closed ? distance % length : Math.max(0, Math.min(length, distance));
+          const position = offset < 0 ? offset + length : offset;
+          for (let index = 1; index < path.length; index++) {
+            const segment = distances[index] - distances[index - 1];
+            if (!segment || position > distances[index]) continue;
+            const a = path[index - 1],
+              b = path[index];
+            const fraction = (position - distances[index - 1]) / segment;
+            return {
+              x: a[0] + (b[0] - a[0]) * fraction,
+              y: a[1] + (b[1] - a[1]) * fraction,
+              angle: Math.atan2(b[1] - a[1], b[0] - a[0]),
+            };
+          }
+        },
+      };
+    },
+    fitBounds(width, height, bounds, padding = 16) {
+      const { minX, minY, maxX, maxY } = bounds;
+      if (
+        ![width, height, minX, minY, maxX, maxY, padding].every(Number.isFinite) ||
+        width <= 0 ||
+        height <= 0 ||
+        padding < 0 ||
+        maxX < minX ||
+        maxY < minY
+      )
+        throw new RangeError(
+          'Fit bounds require finite, ordered bounds and positive viewport dimensions',
+        );
+      const inset = Math.min(padding, width * 0.45, height * 0.45);
+      const spanX = maxX - minX,
+        spanY = maxY - minY;
+      const fit = Math.min(
+        spanX ? (width - 2 * inset) / spanX : Infinity,
+        spanY ? (height - 2 * inset) / spanY : Infinity,
+      );
+      const scale = Number.isFinite(fit) ? fit : 1;
+      const x = width / 2 - (minX + spanX / 2) * scale;
+      const y = height / 2 - (minY + spanY / 2) * scale;
+      return { scale, x, y, project: (px, py) => ({ x: x + px * scale, y: y + py * scale }) };
+    },
+    bind(root, update) {
+      const currentControls = () => [
+        ...root.querySelectorAll('input[name], select[name], textarea[name]'),
+      ];
+      const initial = new WeakMap(
+        currentControls().map(control => [
+          control,
+          {
+            value: control.value,
+            checked: control.checked,
+          },
+        ]),
+      );
+      const render = event => {
+        // Editors may be mounted after binding or removed when changing modules.
+        const controls = currentControls();
+        const source = event?.target;
+        const numeric = control => ['number', 'range'].includes(control.type);
+        const sourceIsNumeric = controls.includes(source) && numeric(source);
+        if (sourceIsNumeric) {
+          if (!source.validity.valid || !Number.isFinite(source.valueAsNumber)) return;
+          controls.forEach(control => {
+            if (control !== source && control.name === source.name && numeric(control))
+              control.value = source.value;
+          });
+        }
+        const values = Object.create(null);
+        for (const control of controls) {
+          if (control.type === 'radio' && !control.checked) continue;
+          if (sourceIsNumeric && numeric(control) && control.name === source.name) continue;
+          if (!control.validity.valid) return;
+          const value =
+            control.type === 'checkbox'
+              ? control.checked
+              : ['number', 'range'].includes(control.type)
+                ? control.valueAsNumber
+                : control.value;
+          if (typeof value === 'number' && !Number.isFinite(value)) return;
+          values[control.name] = value;
+        }
+        // A range may round to a coarser step; retain the actively edited number.
+        if (sourceIsNumeric) values[source.name] = source.valueAsNumber;
+        update(values);
+      };
+      root.addEventListener('input', render);
+      render();
+      return {
+        render,
+        reset() {
+          currentControls().forEach(control => {
+            const saved = initial.get(control);
+            if (saved) {
+              control.value = saved.value;
+              control.checked = saved.checked;
+            } else if (control.tagName === 'SELECT') {
+              const options = [...control.options];
+              const defaults = options.filter(option => option.defaultSelected);
+              if (control.multiple)
+                options.forEach(option => {
+                  option.selected = option.defaultSelected;
+                });
+              else control.selectedIndex = options.indexOf(defaults.at(-1) || options[0]);
+            } else {
+              control.value = control.defaultValue;
+              control.checked = control.defaultChecked;
+            }
+          });
+          render();
+        },
+        dispose() {
+          root.removeEventListener('input', render);
+        },
+      };
+    },
+    canvas(root, { label, height = 280, aspectRatio, draw }) {
+      if (
+        typeof label !== 'string' ||
+        !label.trim() ||
+        typeof draw !== 'function' ||
+        !Number.isFinite(height) ||
+        height <= 0 ||
+        (aspectRatio !== undefined && (!Number.isFinite(aspectRatio) || aspectRatio <= 0))
+      )
+        throw new Error('Canvas needs a label, draw callback and positive height and aspect ratio');
+      const canvas = document.createElement('canvas');
+      canvas.setAttribute('role', 'img');
+      canvas.setAttribute('aria-label', label);
+      // Drawing-buffer pixels must never contribute to the element's CSS height.
+      canvas.style.cssText = `display:block;width:100%;height:${height}px`;
+      root.append(canvas);
+      const ctx = canvas.getContext('2d');
+      const probes = Object.fromEntries(
+        ['background', 'foreground', 'muted', 'muted-foreground', 'border', 'primary'].map(key => {
+          const probe = document.createElement('span');
+          probe.style.cssText = `position:absolute;visibility:hidden;pointer-events:none;color:var(--${key})`;
+          root.append(probe);
+          return [key, probe];
+        }),
+      );
+      let colors,
+        width = 0,
+        surfaceHeight = height,
+        ratio = 1,
+        elapsed = 0,
+        last,
+        frame,
+        playing = false,
+        disposed = false;
+      const readColors = () => {
+        colors = Object.fromEntries(
+          Object.entries(probes).map(([key, probe]) => [key, getComputedStyle(probe).color]),
+        );
+      };
+      const paint = (delta = 0) => {
+        if (disposed || !width) return;
+        ctx.save();
+        try {
+          ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+          ctx.clearRect(0, 0, width, surfaceHeight);
+          draw({ ctx, width, height: surfaceHeight, time: elapsed, delta, colors });
+        } finally {
+          ctx.restore();
+        }
+      };
+      const resize = () => {
+        const nextWidth = root.getBoundingClientRect().width;
+        if (!nextWidth) return;
+        const nextRatio = Math.min(window.devicePixelRatio || 1, 2);
+        const nextHeight =
+          aspectRatio === undefined ? height : Math.min(height, nextWidth / aspectRatio);
+        if (nextWidth !== width || nextRatio !== ratio || nextHeight !== surfaceHeight) {
+          width = nextWidth;
+          ratio = nextRatio;
+          surfaceHeight = nextHeight;
+          canvas.style.height = `${surfaceHeight}px`;
+          canvas.width = Math.round(width * ratio);
+          canvas.height = Math.round(surfaceHeight * ratio);
+        }
+        paint();
+      };
+      const tick = now => {
+        frame = undefined;
+        if (!playing || disposed) return;
+        const delta = last === undefined ? 0 : Math.max(0, Math.min((now - last) / 1000, 0.1));
+        last = last === undefined ? now : Math.max(last, now);
+        elapsed += delta;
+        paint(delta);
+        if (playing && !disposed) frame = requestAnimationFrame(tick);
+      };
+      const pause = () => {
+        playing = false;
+        cancelAnimationFrame(frame);
+        frame = undefined;
+        last = undefined;
+      };
+      const render = () => {
+        if (!disposed) {
+          readColors();
+          paint();
+        }
+      };
+      const visibility = () => {
+        last = undefined;
+      };
+      const observer = new ResizeObserver(resize);
+      const theme = new MutationObserver(render);
+      const scheme = matchMedia('(prefers-color-scheme: dark)');
+      const dispose = () => {
+        if (disposed) return;
+        pause();
+        disposed = true;
+        observer.disconnect();
+        theme.disconnect();
+        removeEventListener('resize', resize);
+        removeEventListener('pagehide', dispose);
+        document.removeEventListener('visibilitychange', visibility);
+        scheme.removeEventListener('change', render);
+        Object.values(probes).forEach(probe => probe.remove());
+        canvas.remove();
+      };
+      readColors();
+      resize();
+      observer.observe(root);
+      theme.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['style', 'class'],
+      });
+      addEventListener('resize', resize);
+      addEventListener('pagehide', dispose, { once: true });
+      document.addEventListener('visibilitychange', visibility);
+      scheme.addEventListener('change', render);
+      return {
+        element: canvas,
+        get time() {
+          return elapsed;
+        },
+        play() {
+          if (!playing && !disposed) {
+            playing = true;
+            last = performance.now();
+            frame = requestAnimationFrame(tick);
+          }
+        },
+        pause,
+        reset() {
+          pause();
+          elapsed = 0;
+          render();
+        },
+        render,
+        dispose,
+      };
+    },
+    design({ id, label, values, fields, onChange }) {
+      if (
+        !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,31}$/.test(id) ||
+        groups.has(id) ||
+        typeof label !== 'string' ||
+        !label.length ||
+        label.length > 40 ||
+        typeof onChange !== 'function' ||
+        !Array.isArray(fields) ||
+        descriptors().length + fields.length > 12
+      )
+        throw new Error('Invalid design group');
+      const initial = { ...values },
+        current = { ...values };
+      const keys = new Set();
+      for (const field of fields) {
+        if (
+          !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,31}$/.test(field.key) ||
+          keys.has(field.key) ||
+          typeof field.label !== 'string' ||
+          !field.label.length ||
+          field.label.length > 50
+        )
+          throw new Error('Invalid design field');
+        keys.add(field.key);
+        if (
+          field.kind === 'range' &&
+          (![field.min, field.max, field.step].every(Number.isFinite) ||
+            field.min >= field.max ||
+            field.step <= 0 ||
+            field.step > field.max - field.min)
+        )
+          throw new Error('Invalid range');
+        if (
+          field.kind === 'select' &&
+          (!Array.isArray(field.options) ||
+            !field.options.length ||
+            field.options.length > 12 ||
+            new Set(field.options).size !== field.options.length ||
+            field.options.some(
+              option => typeof option !== 'string' || !option || option.length > 100,
+            ))
+        )
+          throw new Error('Invalid choices');
+        if (!valid(field, initial[field.key])) throw new Error('Invalid initial design value');
+        const saved = snapshot.design[`${id}/${field.key}`];
+        if (valid(field, saved)) current[field.key] = saved;
+      }
+      const group = { id, label, fields, values: current, initial, onChange };
+      groups.set(id, group);
+      onChange({ ...current });
+      register();
+      return () => {
+        groups.delete(id);
+        register();
+      };
+    },
+    variants(root, { selected, onChange = () => {} } = {}) {
+      const views = [...root.children].filter(el => el.hasAttribute('data-raccoon-variant'));
+      if (!views.length) return () => {};
+      const names = views.map(el => el.getAttribute('data-raccoon-variant'));
+      if (names.some(name => !name) || new Set(names).size !== names.length)
+        throw new Error('Variant names must be non-empty and unique');
+      let index = Math.max(0, names.indexOf(selected));
+      const nav = document.createElement('nav');
+      nav.className = 'rv-variants';
+      const previous = document.createElement('button'),
+        next = document.createElement('button');
+      const picker = document.createElement('select');
+      previous.type = next.type = 'button';
+      previous.textContent = '‹';
+      next.textContent = '›';
+      names.forEach(name => {
+        const option = document.createElement('option');
+        option.textContent = option.value = name;
+        picker.append(option);
+      });
+      const render = () => {
+        views.forEach((el, i) => {
+          el.hidden = i !== index;
+        });
+        picker.value = names[index];
+        previous.disabled = index === 0;
+        next.disabled = index === names.length - 1;
+      };
+      const choose = i => {
+        index = i;
+        render();
+        onChange(names[index]);
+      };
+      previous.onclick = () => choose(Math.max(0, index - 1));
+      next.onclick = () => choose(Math.min(names.length - 1, index + 1));
+      picker.onchange = () => choose(names.indexOf(picker.value));
+      const translate = () => {
+        nav.setAttribute('aria-label', text().variant);
+        picker.setAttribute('aria-label', text().variant);
+        previous.setAttribute('aria-label', text().previous);
+        next.setAttribute('aria-label', text().next);
+      };
+      translate();
+      render();
+      languageListeners.add(translate);
+      nav.append(previous, picker, next);
+      root.append(nav);
+      return () => {
+        languageListeners.delete(translate);
+        nav.remove();
+      };
+    },
+    tabs(root) {
+      const tabs = [...root.querySelectorAll('[role="tab"]')];
+      const enabled = tab => !tab.disabled && tab.getAttribute('aria-disabled') !== 'true';
+      const group = tab =>
+        tabs.filter(item => item.closest('[role="tablist"]') === tab.closest('[role="tablist"]'));
+      const activate = tab => {
+        group(tab).forEach(item => {
+          const active = item === tab;
+          item.setAttribute('aria-selected', String(active));
+          item.tabIndex = active ? 0 : -1;
+          const panel = document.getElementById(item.getAttribute('aria-controls'));
+          if (panel && root.contains(panel)) panel.hidden = !active;
+        });
+      };
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          if (enabled(tab)) activate(tab);
+        });
+        tab.addEventListener('keydown', event => {
+          if (
+            event.defaultPrevented ||
+            event.altKey ||
+            event.ctrlKey ||
+            event.metaKey ||
+            event.shiftKey
+          )
+            return;
+          const choices = group(tab).filter(enabled);
+          const vertical =
+            tab.closest('[role="tablist"]')?.getAttribute('aria-orientation') === 'vertical';
+          const previous = vertical ? 'ArrowUp' : 'ArrowLeft';
+          const next = vertical ? 'ArrowDown' : 'ArrowRight';
+          const index = choices.indexOf(tab);
+          if (index < 0 || ![previous, next, 'Home', 'End'].includes(event.key)) return;
+          event.preventDefault();
+          const target =
+            event.key === 'Home'
+              ? choices[0]
+              : event.key === 'End'
+                ? choices.at(-1)
+                : choices[
+                    (index + (event.key === next ? 1 : -1) + choices.length) % choices.length
+                  ];
+          activate(target);
+          target.focus({ preventScroll: true });
+        });
+      });
+      const groups = [...new Set(tabs.map(tab => tab.closest('[role="tablist"]')))];
+      groups.forEach(list => {
+        const choices = tabs.filter(tab => tab.closest('[role="tablist"]') === list);
+        const selected =
+          choices.find(tab => enabled(tab) && tab.getAttribute('aria-selected') === 'true') ||
+          choices.find(enabled);
+        if (selected) activate(selected);
+        else
+          choices.forEach(tab => {
+            tab.tabIndex = -1;
+          });
+      });
+    },
+    icons(root) {
+      // Small geometric symbols authored for this runtime, not a third-party icon set.
+      const shapes = {
+        plus: [['path', { d: 'M12 5V19M5 12H19' }]],
+        close: [['path', { d: 'M6 6L18 18M18 6L6 18' }]],
+        check: [['path', { d: 'M5 12L10 17L19 7' }]],
+        menu: [['path', { d: 'M4 6H20M4 12H20M4 18H20' }]],
+        search: [
+          ['circle', { cx: 10, cy: 10, r: 6 }],
+          ['path', { d: 'M15 15L21 21' }],
+        ],
+        next: [['path', { d: 'M9 5L16 12L9 19' }]],
+        previous: [['path', { d: 'M15 5L8 12L15 19' }]],
+      };
+      root.querySelectorAll('[data-raccoon-icon]').forEach(element => {
+        const definition = shapes[element.getAttribute('data-raccoon-icon')];
+        if (!definition) return;
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        Object.entries({
+          viewBox: '0 0 24 24',
+          width: 18,
+          height: 18,
+          fill: 'none',
+          stroke: 'currentColor',
+          'stroke-width': 1.75,
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          'aria-hidden': 'true',
+        }).forEach(([key, value]) => svg.setAttribute(key, String(value)));
+        definition.forEach(([tag, attributes]) => {
+          const shape = document.createElementNS('http://www.w3.org/2000/svg', tag);
+          Object.entries(attributes).forEach(([key, value]) =>
+            shape.setAttribute(key, String(value)),
+          );
+          svg.append(shape);
+        });
+        element.replaceChildren(svg);
+      });
+    },
+    schedule(root, events) {
+      const list = document.createElement('ol');
+      list.className = 'rv-schedule';
+      [...events]
+        .sort((a, b) => a.start.localeCompare(b.start))
+        .forEach(event => {
+          const row = document.createElement('li'),
+            time = document.createElement('time');
+          const title = document.createElement('span');
+          time.textContent = `${event.start}–${event.end}`;
+          title.textContent = event.title;
+          row.append(time, title);
+          list.append(row);
+        });
+      root.replaceChildren(list);
+    },
+  };
+})();
+</script><div id="hl-app"><style>
+#hl-app{--bg:#f3f2f5;--surface:#fff;--ink:#252333;--muted:#777382;--line:#eceaf0;--pink:#ed526f;--purple:#7355ad;color:var(--ink);font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);max-width:1050px;margin:auto;min-height:720px;padding:25px;display:grid;place-items:center}#hl-app *{box-sizing:border-box}#hl-app button,#hl-app input,#hl-app select,#hl-app textarea{font:inherit}#hl-app button{cursor:pointer}#hl-app button:focus-visible,#hl-app input:focus-visible,#hl-app select:focus-visible,#hl-app textarea:focus-visible{outline:3px solid #ed526f88;outline-offset:2px}#hl-app .phone{position:relative;width:min(100%,430px);height:min(820px,calc(100dvh - 35px));min-height:610px;border-radius:32px;background:#fff;box-shadow:0 20px 65px #39314924;overflow:hidden;display:flex;flex-direction:column;border:1px solid #ece9ee}#hl-app .header{height:66px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:1px solid var(--line)}#hl-app .logo{font-weight:900;font-size:23px;letter-spacing:-1px}#hl-app .logo span{color:var(--pink)}#hl-app .demo{color:var(--purple);background:#f1ecf9;font-weight:800;font-size:10px;letter-spacing:.8px;padding:7px 9px;border-radius:20px}#hl-app .screen{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;background:#faf9fb}#hl-app .bottom{flex:none;display:flex;justify-content:space-around;align-items:center;height:68px;padding:3px 8px 6px;border-top:1px solid var(--line);background:#fff}#hl-app .bottom button{border:0;background:transparent;color:#938f9d;display:grid;place-items:center;gap:2px;min-width:62px;min-height:54px;border-radius:13px;font-size:10px;font-weight:700}#hl-app .bottom button[aria-current=page]{color:var(--pink);background:#fff2f5}#hl-app .bottom svg{width:23px;height:23px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}#hl-app .topline{padding:19px 20px 13px;display:flex;align-items:flex-end;justify-content:space-between}#hl-app h1{font-size:28px;line-height:1.1;margin:0;letter-spacing:-.8px}#hl-app h2{font-size:22px;line-height:1.15;margin:0}#hl-app p{margin:0;color:var(--muted)}#hl-app .kicker{font-size:11px;color:var(--pink);font-weight:800;letter-spacing:1.3px;text-transform:uppercase;margin-bottom:6px}#hl-app .small{font-size:12px;color:var(--muted)}#hl-app .pill{background:#fff;border:1px solid var(--line);border-radius:30px;padding:7px 11px;color:#605b6c;font-size:12px;font-weight:700}#hl-app .filters{padding:0 18px 13px;display:flex;gap:8px;align-items:center}#hl-app input,#hl-app select,#hl-app textarea{border:1px solid #dfdce5;border-radius:12px;padding:11px 12px;background:white;color:var(--ink);min-height:43px;width:100%}#hl-app .filters input{min-width:0;flex:1}#hl-app .filters select{width:115px;flex:none}#hl-app .deck{padding:0 18px 18px}#hl-app .profile-card{background:white;border-radius:22px;box-shadow:0 9px 30px #2c253515;overflow:hidden;border:1px solid #ebe7ef}#hl-app .art{height:315px;position:relative;overflow:hidden;background:var(--art)}#hl-app .art:before{content:"";position:absolute;width:230px;height:230px;border-radius:50%;background:#ffffff3d;left:-35px;top:-45px}#hl-app .art:after{content:"";position:absolute;width:200px;height:200px;border-radius:35% 65% 55% 45%;background:#ffffff29;right:-30px;bottom:-75px;transform:rotate(22deg)}#hl-app .initial{position:absolute;inset:0;display:grid;place-items:center;font-size:145px;font-weight:800;letter-spacing:-12px;color:#ffffffbc;text-shadow:0 8px 40px #43304b26}#hl-app .art-caption{position:absolute;left:18px;bottom:18px;color:white;font-weight:800;font-size:12px;background:#21182c66;backdrop-filter:blur(5px);border-radius:18px;padding:7px 11px;z-index:1}#hl-app .card-copy{padding:18px 19px 20px}#hl-app .name{font-size:28px;font-weight:800;letter-spacing:-.7px}#hl-app .meta{font-size:13px;color:var(--muted);margin:3px 0 13px}#hl-app .prompt{background:#f7f4fa;border-radius:15px;padding:13px 15px;margin:13px 0;font-size:15px;font-weight:650;line-height:1.4}#hl-app .prompt small{display:block;color:var(--purple);font-size:11px;font-weight:800;margin-bottom:6px;text-transform:uppercase;letter-spacing:.8px}#hl-app .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}#hl-app .chips span{border:1px solid #e9e5ee;background:#fff;border-radius:20px;padding:5px 9px;font-size:11px;color:#6a6274;font-weight:700}#hl-app .actions{display:flex;justify-content:center;gap:18px;padding:16px 0 3px}#hl-app .round{border:1px solid #eae6ec;background:white;border-radius:50%;width:58px;height:58px;display:grid;place-items:center;font-size:26px;box-shadow:0 5px 15px #21152612}#hl-app .round.like{color:white;background:linear-gradient(135deg,#ff6e81,#db3e71);border:0;width:66px;height:66px;font-size:30px}#hl-app .round.pass{color:#706879}#hl-app .round.detail{color:var(--purple)}#hl-app .hintline{text-align:center;color:#a29ca9;font-size:11px;padding:8px 0}#hl-app .empty{margin:16px 18px;padding:36px 20px;text-align:center;background:#fff;border:1px dashed #dcd6e2;border-radius:20px}#hl-app .empty .symbol{font-size:36px;color:var(--pink);margin-bottom:10px}#hl-app .empty h2{margin-bottom:7px}#hl-app .primary,#hl-app .secondary{border:0;border-radius:12px;min-height:44px;padding:10px 17px;font-weight:800}#hl-app .primary{background:var(--pink);color:#fff}#hl-app .secondary{background:#f0edf3;color:#504758}#hl-app .list{padding:0 16px 24px}#hl-app .list-item{display:flex;gap:12px;align-items:center;background:white;border:1px solid var(--line);border-radius:17px;padding:12px;margin-bottom:9px}#hl-app .avatar{height:56px;width:56px;flex:none;border-radius:17px;display:grid;place-items:center;color:white;font-size:29px;font-weight:800}#hl-app .list-item .text{flex:1;min-width:0}#hl-app .list-item .text strong{display:block;font-size:16px}#hl-app .list-item .text span{display:block;color:var(--muted);font-size:12px}#hl-app .list-item button{border:0;background:#fff0f4;color:var(--pink);font-size:12px;font-weight:800;border-radius:10px;padding:10px}#hl-app .info-box{margin:10px 18px 20px;padding:13px 14px;border-radius:13px;background:#f2edf9;color:#655477;font-size:12px}#hl-app .form{padding:0 18px 26px}#hl-app .field{margin:15px 0}#hl-app label{display:block;font-size:12px;font-weight:800;margin-bottom:6px}#hl-app textarea{resize:vertical;min-height:90px}#hl-app .interests{display:flex;gap:7px;flex-wrap:wrap}#hl-app .interests button{border:1px solid #e7e1ed;background:white;border-radius:20px;padding:7px 11px;font-size:12px;color:#655e70}#hl-app .interests button[aria-pressed=true]{background:#fce5ec;border-color:#f4a4b8;color:#b92d59}#hl-app .error{min-height:18px;font-size:12px;color:#b82744}#hl-app .sheet-back{position:absolute;inset:0;background:#1b142a8f;z-index:5;display:flex;align-items:flex-end}#hl-app .sheet{background:#fff;width:100%;max-height:91%;overflow:auto;border-radius:25px 25px 0 0;padding:20px}#hl-app .sheet-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}#hl-app .close{border:0;border-radius:50%;background:#f0eef3;width:40px;height:40px;font-size:22px}#hl-app .sheet .art{height:205px;border-radius:15px;margin:15px 0}#hl-app .sheet-actions{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap}#hl-app .toast{position:absolute;z-index:10;bottom:77px;left:20px;right:20px;background:#2f273a;color:#fff;border-radius:12px;padding:12px 15px;text-align:center;font-size:13px;box-shadow:0 8px 25px #16101d44}#hl-app .safety{padding:12px 18px 22px;color:#918b99;font-size:11px;line-height:1.5}#hl-app .count{color:var(--pink)}@media(max-width:540px){#hl-app{padding:0;display:block;min-height:100dvh;background:white}#hl-app .phone{width:100%;height:100dvh;min-height:0;border:0;border-radius:0;box-shadow:none}#hl-app .art{height:min(38vh,315px)}}@media(prefers-reduced-motion:no-preference){#hl-app button{transition:transform .16s,background .16s}#hl-app button:active{transform:scale(.94)}#hl-app .profile-card{animation:hl-in .22s ease-out}@keyframes hl-in{from{opacity:.4;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}}
+#hl-app{--bg:#e9edf1;--surface:#fff;--ink:#142b3b;--muted:#5e7180;--line:#dfe6e8;--pink:#9d394d;--purple:#1c6170;background:linear-gradient(145deg,#e8eef0,#f5f1ed)}#hl-app .phone{border-radius:24px;box-shadow:0 26px 70px #12304726;border-color:#cbd6d9}#hl-app .header{background:#163d4b;color:white;border-color:#365868}#hl-app .logo{font-family:Georgia,serif;font-size:22px;font-weight:700;letter-spacing:-.5px}#hl-app .logo span{color:#efc5a8}#hl-app .demo{background:#ffffff20;color:#e8f0f2}#hl-app .screen{background:#f7f8f7}#hl-app .bottom button[aria-current=page]{background:#e8f0f0;color:#185365}#hl-app .kicker{color:#9d394d}#hl-app .pill{color:#1c6170}#hl-app .profile-card{border-radius:18px;box-shadow:0 8px 28px #173a4a12}#hl-app .prompt{background:#eef4f3}#hl-app .prompt small{color:#1c6170}#hl-app .round.like,#hl-app .primary{background:#9d394d;color:white}#hl-app .round.detail{color:#1c6170}#hl-app .info-box{background:#e9f1f0;color:#315b61}#hl-app .list-item button{background:#e9f1f0;color:#1c6170}#hl-app .safety{color:#697b83}#hl-app .review-strip{background:#173e4d;color:#f8f8f4;padding:19px 20px 17px;border-bottom:4px solid #d2a77e}#hl-app .review-strip .mark{font-size:10px;font-weight:800;letter-spacing:1.5px;color:#d7b89e;text-transform:uppercase}#hl-app .review-strip h2{font:normal 23px/1.12 Georgia,serif;margin:6px 0 5px}#hl-app .review-strip p{color:#d2e0e3;font-size:12px;line-height:1.45}#hl-app .review-strip .proof{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}#hl-app .review-strip .proof span{font-size:10px;border:1px solid #74939b;border-radius:30px;padding:5px 8px;color:#e6eff0}#hl-app .panel-note{margin:0 18px 15px;padding:13px 14px;border:1px solid #dbe6e5;background:#f0f6f4;border-radius:12px;font-size:12px;color:#31565e;line-height:1.45}#hl-app .panel-note strong{display:block;color:#143e49;margin-bottom:3px}#hl-app .art{background:linear-gradient(145deg,var(--art),#294b58)}#hl-app .initial{font-family:Georgia,serif;font-weight:400}#hl-app .header .logo small{display:block;font:600 9px/1 sans-serif;letter-spacing:1.2px;text-transform:uppercase;color:#c8dade;margin-top:2px}#hl-app .header{height:76px}#hl-app .logo{font-size:19px}#hl-app .demo{font-size:9px;white-space:nowrap}@media(max-width:540px){#hl-app .phone{border-radius:0}}\n</style><div class="phone"><header class="header"><div class="logo">HKU <span>Common Ground</span><small>Meaningful connections, thoughtfully made</small></div><span class="demo">PANEL DEMO</span></header><main class="screen" id="hla-screen"></main><nav class="bottom" aria-label="App navigation"><button type="button" data-tab="discover" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 3 8l9 5 9-5-9-5ZM5 11v6c4 3 10 3 14 0v-6M21 8v8"/></svg>Discover</button><button type="button" data-tab="likes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 8.5c0 4.2-8.5 10-8.5 10s-8.5-5.8-8.5-10a4.5 4.5 0 0 1 8.5-2 4.5 4.5 0 0 1 8.5 2Z"/></svg>Likes <span id="hla-likes"></span></button><button type="button" data-tab="matches"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-9-5.8-9-11a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 5.2-9 11-9 11Z"/><path d="m8.5 11 2.2 2.2 4.8-4.8"/></svg>Matches <span id="hla-matches"></span></button><button type="button" data-tab="profile"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3-6 8-6s8 2 8 6"/></svg>Profile</button></nav><div id="hla-overlay"></div><div id="hla-toast" role="status" aria-live="polite"></div></div><script>
+(()=>{const root=document.getElementById('hl-app'),screen=root.querySelector('#hla-screen'),overlay=root.querySelector('#hla-overlay');const people=[{id:1,name:'Avery',age:22,major:'Architecture',year:'Year 4',bio:'Always sketching city corners. Looking for someone who will wander around Sheung Wan and rate the cafés with me.',interests:['Coffee','Art','Hiking'],prompt:'A bookshop, then sunset at the harbour.',question:'My ideal first date',color:'#da8a98',glyph:'A',motif:'slow Sunday walks'},{id:2,name:'Jordan',age:23,major:'Computer Science',year:'Postgraduate',bio:'Bad at small talk, great at finding tiny neighbourhood noodle shops. I host low-stakes board game nights.',interests:['Food','Games','Music'],prompt:'The playlist I made for the MTR.',question:'Ask me about',color:'#7c9ab8',glyph:'J',motif:'one more game?'},{id:3,name:'Mika',age:21,major:'Psychology',year:'Year 3',bio:'Trying to read more fiction and see more of Hong Kong. Come join me for a gentle hike or a gallery afternoon.',interests:['Books','Hiking','Art'],prompt:'Kindness to waiters and strangers.',question:'A green flag',color:'#a4b698',glyph:'M',motif:'take the scenic route'},{id:4,name:'Sam',age:24,major:'Law',year:'Postgraduate',bio:'My perfect weekend has dim sum, live music, and absolutely no email. Passionate amateur photographer.',interests:['Music','Food','Photography'],prompt:'An excellent recommendation.',question:'The way to my heart',color:'#b295bb',glyph:'S',motif:'after the last song'},{id:5,name:'Riley',age:22,major:'Medicine',year:'Year 4',bio:'Early morning swimmer and late-night trivia enthusiast. Looking for a thoughtful plus-one to discover the city.',interests:['Swimming','Games','Coffee'],prompt:'Breakfast is the best meal.',question:'A hill I will die on',color:'#c99b7f',glyph:'R',motif:'meet by the sea'},{id:6,name:'Taylor',age:21,major:'Business',year:'Year 3',bio:'Collector of second-hand books and obscure film recommendations. Usually exploring a new corner of the island.',interests:['Books','Film','Food'],prompt:'A film you still think about.',question:'Tell me about',color:'#9c9bc2',glyph:'T',motif:'new city stories'}];const options=['Coffee','Art','Hiking','Food','Games','Music','Books','Photography','Swimming','Film'];const s={tab:'discover',likes:new Set(),matches:new Set(),passed:new Set(),blocked:new Set(),search:'',filter:'All',profile:{name:'',age:'',major:'',bio:'',interests:[]}};const esc=x=>String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));function flash(text){root.querySelector('#hla-toast').innerHTML='<div class="toast">'+esc(text)+'</div>';clearTimeout(flash.t);flash.t=setTimeout(()=>root.querySelector('#hla-toast').innerHTML='',3000)}function art(p){return '<div class="art" style="--art:'+p.color+'"><div class="initial">'+p.glyph+'</div><div class="art-caption">'+esc(p.motif)+'</div></div>'}function available(){return people.filter(p=>!s.passed.has(p.id)&&!s.blocked.has(p.id)&&!s.likes.has(p.id)&&(!s.search||[p.name,p.major,p.bio,...p.interests].join(' ').toLowerCase().includes(s.search.toLowerCase()))&&(s.filter==='All'||p.interests.includes(s.filter)))}function discover(){let list=available(),p=list[0];screen.innerHTML='<section class="review-strip"><div class="mark">Independent student concept</div><h2>Find common ground, beyond the classroom.</h2><p>A considered way for adult students to discover people through shared interests and conversation prompts.</p><div class="proof"><span>Interest-led discovery</span><span>Mutual connections</span><span>Safety by design</span></div></section><div class="topline"><div><div class="kicker">Explore the concept</div><h1>Discover</h1></div><span class="pill">'+list.length+' to explore</span></div><div class="filters"><input id="hla-search" type="search" aria-label="Search profiles" placeholder="Search people or interests" value="'+esc(s.search)+'"><select id="hla-filter" aria-label="Filter by interest"><option>All</option>'+options.map(x=>'<option '+(x===s.filter?'selected':'')+'>'+x+'</option>').join('')+'</select></div><div id="hla-deck">'+(p?'<div class="deck"><article class="profile-card">'+art(p)+'<div class="card-copy"><div class="name">'+esc(p.name)+', '+p.age+'</div><div class="meta">'+esc(p.major)+' · '+esc(p.year)+'</div><p>'+esc(p.bio)+'</p><div class="prompt"><small>'+esc(p.question)+'</small>'+esc(p.prompt)+'</div><div class="chips">'+p.interests.map(x=>'<span>'+esc(x)+'</span>').join('')+'</div></div></article><div class="actions"><button class="round pass" data-pass="'+p.id+'" aria-label="Pass on '+esc(p.name)+'" title="Pass">×</button><button class="round detail" data-detail="'+p.id+'" aria-label="See '+esc(p.name)+'’s full profile" title="Full profile">⌄</button><button class="round like" data-like="'+p.id+'" aria-label="Like '+esc(p.name)+'" title="Like">♥</button></div><div class="hintline">Pass · See more · Like</div></div>':'<div class="empty"><div class="symbol">♡</div><h2>That’s everyone for now</h2><p class="small">Try another interest or clear your search.</p><button class="secondary" data-clear style="margin-top:17px">Clear filters</button></div>')+'</div><div class="panel-note"><strong>Prototype boundaries</strong>All profiles are fictional and the matching outcome is simulated. No accounts, messages or data are sent. A real launch requires identity and age checks, privacy controls and moderation.</div><div class="safety">Independent concept, not affiliated with or endorsed by HKU. Adults 18+ only.</div>'}function collection(which){let list=people.filter(p=>!s.blocked.has(p.id)&&(which==='likes'?s.likes.has(p.id):s.matches.has(p.id)));screen.innerHTML='<div class="topline"><div><div class="kicker">Your connections</div><h1>'+(which==='likes'?'Likes':'Matches')+'</h1></div><span class="pill">'+list.length+'</span></div><div class="list">'+(list.length?list.map(p=>'<div class="list-item"><div class="avatar" style="background:'+p.color+'">'+p.glyph+'</div><div class="text"><strong>'+esc(p.name)+', '+p.age+'</strong><span>'+(s.matches.has(p.id)?'A mutual spark ✦':'You liked '+esc(p.name))+'</span></div><button data-detail="'+p.id+'">View</button></div>').join(''):'<div class="empty" style="margin:0"><div class="symbol">♡</div><h2>'+(which==='likes'?'No likes yet':'No matches yet')+'</h2><p class="small">A good connection starts with curiosity.</p><button class="primary" data-tab="discover" style="margin-top:16px">Discover people</button></div>')+'</div><div class="info-box">'+(which==='likes'?'Demo note: Avery and Mika like you back. A like from you creates a sample mutual match.':'A mutual match is demonstrated locally. Messaging and contact with real people are not enabled.')+'</div>'}function profile(){let p=s.profile;screen.innerHTML='<div class="topline"><div><div class="kicker">Make it yours</div><h1>Your profile</h1></div></div><div class="form"><p class="small">Saved only in this demo session. Do not enter contact details.</p><div class="field"><label for="hla-name">Display name</label><input id="hla-name" maxlength="40" placeholder="Your name" value="'+esc(p.name)+'"></div><div class="field"><label for="hla-age">Age · 18 or older</label><input id="hla-age" type="number" min="18" max="99" placeholder="22" value="'+esc(p.age)+'"></div><div class="field"><label for="hla-major">Field of study</label><input id="hla-major" maxlength="60" placeholder="e.g. Engineering" value="'+esc(p.major)+'"></div><div class="field"><label for="hla-bio">Your story</label><textarea id="hla-bio" maxlength="180" placeholder="What are you curious about?">'+esc(p.bio)+'</textarea></div><div class="field"><label>Interests</label><div class="interests">'+options.map(x=>'<button type="button" data-interest="'+x+'" aria-pressed="'+p.interests.includes(x)+'">'+x+'</button>').join('')+'</div></div><div class="error" id="hla-error" role="alert"></div><button class="primary" data-save>Save profile</button></div><div class="safety">Launch criteria: verified adult accounts, consent and privacy controls, abuse reporting with human moderation, and a secure backend. This presentation is not a live service.</div>'}function render(){root.querySelectorAll('.bottom [data-tab]').forEach(b=>{if(b.dataset.tab===s.tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});root.querySelector('#hla-likes').textContent=s.likes.size?'· '+s.likes.size:'';root.querySelector('#hla-matches').textContent=s.matches.size?'· '+s.matches.size:'';if(s.tab==='discover')discover();else if(s.tab==='profile')profile();else collection(s.tab);screen.scrollTop=0}function detail(id){let p=people.find(x=>x.id===id);if(!p)return;overlay.innerHTML='<div class="sheet-back"><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="hla-title"><div class="sheet-head"><div><div class="kicker">Get to know me</div><h2 id="hla-title">'+esc(p.name)+', '+p.age+'</h2><p class="small">'+esc(p.major)+' · '+esc(p.year)+'</p></div><button class="close" data-close aria-label="Close profile">×</button></div>'+art(p)+'<p>'+esc(p.bio)+'</p><div class="prompt"><small>'+esc(p.question)+'</small>'+esc(p.prompt)+'</div><div class="chips">'+p.interests.map(x=>'<span>'+esc(x)+'</span>').join('')+'</div><div class="sheet-actions"><button class="primary" data-like="'+p.id+'">'+(s.likes.has(p.id)?'Remove like':'♥ Like '+esc(p.name))+'</button><button class="secondary" data-pass="'+p.id+'">Pass</button><button class="secondary" data-block="'+p.id+'">Block</button></div><p class="small" style="margin-top:16px">Demo-only controls. No report is sent.</p></section></div>';overlay.querySelector('[data-close]').focus()}function close(){overlay.innerHTML=''}root.addEventListener('click',e=>{let b=e.target.closest('button');if(!b)return;if(b.dataset.tab){s.tab=b.dataset.tab;close();render()}else if(b.dataset.detail)detail(+b.dataset.detail);else if(b.hasAttribute('data-close'))close();else if(b.dataset.like){let id=+b.dataset.like;if(s.likes.has(id)){s.likes.delete(id);s.matches.delete(id);flash('Like removed')}else{s.likes.add(id);if(id===1||id===3){s.matches.add(id);flash('It’s a match! Find them in Matches ♥')}else flash('Added to your likes')}close();render()}else if(b.dataset.pass){s.passed.add(+b.dataset.pass);close();render();flash('Passed for now')}else if(b.dataset.block){let id=+b.dataset.block;s.blocked.add(id);s.likes.delete(id);s.matches.delete(id);close();render();flash('Profile blocked locally')}else if(b.hasAttribute('data-clear')){s.search='';s.filter='All';render()}else if(b.dataset.interest){let x=b.dataset.interest;if(s.profile.interests.includes(x))s.profile.interests=s.profile.interests.filter(y=>y!==x);else s.profile.interests.push(x);b.setAttribute('aria-pressed',s.profile.interests.includes(x))}else if(b.hasAttribute('data-save')){let name=root.querySelector('#hla-name').value.trim(),age=Number(root.querySelector('#hla-age').value),major=root.querySelector('#hla-major').value.trim(),bio=root.querySelector('#hla-bio').value.trim(),error=root.querySelector('#hla-error');if(!name||!Number.isInteger(age)||age<18||age>99||!major||!bio){error.textContent='Enter a name, age 18–99, field of study and your story.';return}s.profile={...s.profile,name,age,major,bio};error.textContent='';flash('Profile saved for this session')}});root.addEventListener('input',e=>{if(e.target.id==='hla-search'){s.search=e.target.value;let pos=e.target.selectionStart;discover();let input=root.querySelector('#hla-search');input.focus();input.setSelectionRange(pos,pos)}});root.addEventListener('change',e=>{if(e.target.id==='hla-filter'){s.filter=e.target.value;discover()}});root.addEventListener('keydown',e=>{if(e.key==='Escape'&&overlay.innerHTML)close()});overlay.addEventListener('click',e=>{if(e.target.classList.contains('sheet-back'))close()});render()})();
+</script></div></body></html>
